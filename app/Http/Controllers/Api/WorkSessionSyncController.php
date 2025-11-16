@@ -18,8 +18,20 @@ class WorkSessionSyncController extends Controller
             return response()->json(['message' => 'Técnico no encontrado'], 404);
         }
 
+        // Se espera un array de sesiones en el root del JSON:
+        // [
+        //   {
+        //     "device_session_uuid": "...",
+        //     "device_uuid": "...",          // <- NUEVO (opcional)
+        //     "started_at": "...",
+        //     "ended_at": "...",
+        //     ...
+        //   },
+        //   ...
+        // ]
         $data = $request->validate([
             '*.device_session_uuid' => ['nullable', 'string', 'max:255'],
+            '*.device_uuid'         => ['nullable', 'string', 'max:100'], // <- NUEVO
             '*.started_at'          => ['required', 'date'],
             '*.ended_at'            => ['nullable', 'date'],
             '*.duration_seconds'    => ['nullable', 'integer'],
@@ -49,15 +61,16 @@ class WorkSessionSyncController extends Controller
             }
 
             $session = WorkSession::create([
-                'tecnico_id'        => $tecnico->id,
-                'started_at'        => $item['started_at'],
-                'ended_at'          => $item['ended_at'] ?? null,
-                'duration_seconds'  => $item['duration_seconds'] ?? null,
-                'start_lat'         => $item['start_lat'] ?? null,
-                'start_lng'         => $item['start_lng'] ?? null,
-                'end_lat'           => $item['end_lat'] ?? null,
-                'end_lng'           => $item['end_lng'] ?? null,
+                'tecnico_id'          => $tecnico->id,
+                'started_at'          => $item['started_at'],
+                'ended_at'            => $item['ended_at'] ?? null,
+                'duration_seconds'    => $item['duration_seconds'] ?? null,
+                'start_lat'           => $item['start_lat'] ?? null,
+                'start_lng'           => $item['start_lng'] ?? null,
+                'end_lat'             => $item['end_lat'] ?? null,
+                'end_lng'             => $item['end_lng'] ?? null,
                 'device_session_uuid' => $item['device_session_uuid'] ?? null,
+                'device_uuid'         => $item['device_uuid'] ?? null, // <- NUEVO (si existe la columna)
             ]);
 
             $created[] = $session->id;

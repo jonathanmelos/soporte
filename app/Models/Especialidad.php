@@ -9,10 +9,21 @@ class Especialidad extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['nombre'];
+    // 👇 forzamos el nombre correcto de la tabla
+    protected $table = 'especialidades';
+
+    protected $fillable = [
+        'nombre',
+        'descripcion',
+    ];
 
     public function tecnicos()
     {
-        return $this->belongsToMany(Tecnico::class, 'tecnico_especialidad');
+        return $this->belongsToMany(
+            Tecnico::class,
+            'tecnico_especialidad',
+            'especialidad_id',
+            'tecnico_id',
+        );
     }
 }

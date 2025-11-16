@@ -19,11 +19,14 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
         ]);
 
+        // Nombre por defecto a partir del correo (antes de la @)
+        $defaultName = Str::before($data['email'], '@') ?: 'Técnico HM';
+
         // Usuario por email
         $user = User::firstOrCreate(
             ['email' => $data['email']],
             [
-                'name'              => null,
+                'name'              => $defaultName, // ⬅️ YA NO ES NULL
                 'password'          => bcrypt(Str::random(16)),
                 'email_verified_at' => now(),
             ]
@@ -57,7 +60,8 @@ class AuthController extends Controller
                     ->subject('Código de acceso HM INNOVA');
             });
         } catch (\Throwable $e) {
-            // loguear si quieres
+            // Aquí puedes loguear el error si quieres:
+            // \Log::error('Error enviando mail OTP: '.$e->getMessage());
         }
 
         return response()->json([
