@@ -16,7 +16,6 @@ class TechnicianProfileController extends Controller
             return response()->json(['message' => 'Técnico no encontrado'], 404);
         }
 
-        // Aquí podrías cargar especialidades / zonas / documentos si quieres
         $tecnico->load(['especialidades', 'zonas']);
 
         return response()->json([
@@ -34,28 +33,39 @@ class TechnicianProfileController extends Controller
             return response()->json(['message' => 'Técnico no encontrado'], 404);
         }
 
+        // ⚠️ Usamos "sometimes" para permitir updates parciales
         $data = $request->validate([
-            'cedula'           => ['nullable', 'string', 'max:20'],
-            'nombres'          => ['nullable', 'string', 'max:100'],
-            'apellidos'        => ['nullable', 'string', 'max:100'],
-            'telefono'         => ['nullable', 'string', 'max:20'],
-            'direccion'        => ['nullable', 'string', 'max:255'],
-            'tipo_sangre'      => ['nullable', 'string', 'max:10'],
-            'contacto_emergencia' => ['nullable', 'string', 'max:100'],
-            // luego puedes añadir manejo de especialidades/zonas con arrays
+            'cedula' => [
+                'sometimes',
+                'string',
+                'max:20',
+                'unique:tecnicos,cedula,' . $tecnico->id,
+            ],
+            'nombres'             => ['sometimes', 'string', 'max:100'],
+            'apellidos'           => ['sometimes', 'string', 'max:100'],
+            'telefono'            => ['sometimes', 'nullable', 'string', 'max:20'],
+            'correo'              => ['sometimes', 'nullable', 'email', 'max:100'],
+            'direccion'           => ['sometimes', 'nullable', 'string', 'max:255'],
+            'tipo_sangre'         => ['sometimes', 'nullable', 'string', 'max:10'],
+            'contacto_emergencia' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
+        // Actualiza solo los campos que llegaron
         $tecnico->fill($data);
 
-        if ($tecnico->cedula && $tecnico->nombres && $tecnico->apellidos && $tecnico->telefono) {
-            $tecnico->perfil_completo = true;
-        }
+        // Recalcular si el perfil está completo
+        $tecnico->perfil_completo = (
+            !empty($tecnico->cedula) &&
+            !empty($tecnico->nombres) &&
+            !empty($tecnico->apellidos) &&
+            !empty($tecnico->telefono)
+        );
 
         $tecnico->save();
 
         return response()->json([
-            'message' => 'Perfil actualizado',
-            'tecnico' => $tecnico,
+            'message' => 'Perfil actualizado correctamente',
+            'tecnico' => $tecnico->fresh(),
         ]);
     }
 }

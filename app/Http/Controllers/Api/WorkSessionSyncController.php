@@ -5,33 +5,41 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class WorkSessionSyncController extends Controller
 {
     public function sync(Request $request)
     {
         $user = $request->user();
-        $tecnico = $user->tecnico;
+        $tecnico = $user?->tecnico;
 
         if (! $tecnico) {
-            return response()->json(['message' => 'Técnico no encontrado'], 404);
+            return response()->json([
+                'message' => 'Técnico no encontrado',
+            ], 404);
         }
 
-        // Se espera un array de sesiones en el root del JSON:
-        // [
-        //   {
-        //     "device_session_uuid": "...",
-        //     "device_uuid": "...",          // <- NUEVO (opcional)
-        //     "started_at": "...",
-        //     "ended_at": "...",
-        //     ...
+        // Flutter envía:
+        // {
+        //   "0": {
+        //     "device_session_uuid": "DEVICEUUID_1",
+        //     "device_uuid": "DEVICEUUID",
+        //     "started_at": "2025-11-24T00:00:00.000Z",
+        //     "ended_at":   "2025-11-24T01:00:00.000Z",
+        //     "duration_seconds": 3600,
+        //     "start_lat": null,
+        //     "start_lng": null,
+        //     "end_lat": null,
+        //     "end_lng": null
         //   },
-        //   ...
-        // ]
+        //   "1": { ... }
+        // }
+
         $data = $request->validate([
-            '*.device_session_uuid' => ['nullable', 'string', 'max:255'],
-            '*.device_uuid'         => ['nullable', 'string', 'max:100'], // <- NUEVO
+            '*.device_session_uuid' => ['required', 'string', 'max:255'],
+            '*.device_uuid'         => ['required', 'string', 'max:100'],
             '*.started_at'          => ['required', 'date'],
             '*.ended_at'            => ['nullable', 'date'],
             '*.duration_seconds'    => ['nullable', 'integer'],
@@ -42,54 +50,64 @@ class WorkSessionSyncController extends Controller
         ]);
 
         $created = [];
-        $skipped = [];
+        $updated = [];
 
-        foreach ($data as $item) {
-            $query = WorkSession::where('tecnico_id', $tecnico->id);
+        foreach ($data as $row) {
+            $deviceSessionUuid = $row['device_session_uuid'];
 
-            if (! empty($item['device_session_uuid'])) {
-                $query->where('device_session_uuid', $item['device_session_uuid']);
+            // Buscar si ya existe sesión para este técnico + device_session_uuid
+            $session = WorkSession::where('tecnico_id', $tecnico->id)
+                ->where('device_session_uuid', $deviceSessionUuid)
+                ->first();
+
+            $isNew = false;
+            if (! $session) {
+                $session = new WorkSession();
+                $session->tecnico_id = $tecnico->id;
+                $session->device_session_uuid = $deviceSessionUuid;
+                $session->uuid = (string) Str::uuid();
+                $isNew = true;
+            }
+
+            $session->device_uuid = $row['device_uuid'];
+
+            $session->started_at = Carbon::parse($row['started_at']);
+            $session->ended_at   = !empty($row['ended_at'])
+                ? Carbon::parse($row['ended_at'])
+                : null;
+
+            $session->duration_seconds = $row['duration_seconds'] ?? null;
+
+            $session->start_lat = $row['start_lat'] ?? null;
+            $session->start_lng = $row['start_lng'] ?? null;
+            $session->end_lat   = $row['end_lat'] ?? null;
+            $session->end_lng   = $row['end_lng'] ?? null;
+
+            $session->save();
+
+            if ($isNew) {
+                $created[] = $session->id;
             } else {
-                $query->where('started_at', Carbon::parse($item['started_at']));
+                $updated[] = $session->id;
             }
-
-            $existing = $query->first();
-
-            if ($existing) {
-                $skipped[] = $existing->id;
-                continue;
-            }
-
-            $session = WorkSession::create([
-                'tecnico_id'          => $tecnico->id,
-                'started_at'          => $item['started_at'],
-                'ended_at'            => $item['ended_at'] ?? null,
-                'duration_seconds'    => $item['duration_seconds'] ?? null,
-                'start_lat'           => $item['start_lat'] ?? null,
-                'start_lng'           => $item['start_lng'] ?? null,
-                'end_lat'             => $item['end_lat'] ?? null,
-                'end_lng'             => $item['end_lng'] ?? null,
-                'device_session_uuid' => $item['device_session_uuid'] ?? null,
-                'device_uuid'         => $item['device_uuid'] ?? null, // <- NUEVO (si existe la columna)
-            ]);
-
-            $created[] = $session->id;
         }
 
         return response()->json([
-            'message' => 'Sincronización completada',
+            'status'  => 'ok',
             'created' => $created,
-            'skipped' => $skipped,
+            'updated' => $updated,
         ]);
     }
 
     public function index(Request $request)
     {
         $user = $request->user();
-        $tecnico = $user->tecnico;
+        $tecnico = $user?->tecnico;
 
         if (! $tecnico) {
-            return response()->json(['message' => 'Técnico no encontrado'], 404);
+            return response()->json([
+                'message' => 'Técnico no encontrado',
+            ], 404);
         }
 
         $sessions = WorkSession::where('tecnico_id', $tecnico->id)

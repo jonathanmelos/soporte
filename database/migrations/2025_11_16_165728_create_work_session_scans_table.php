@@ -9,21 +9,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('work_session_scans', function (Blueprint $table) {
-            $table->id();
+    $table->id();
+    $table->string('uuid', 36)->unique();
+    $table->string('session_uuid', 100); // ⬅️ 36 → 100
+    $table->string('project_code', 100)->nullable();
+    $table->string('area', 100)->nullable();
+    $table->text('description')->nullable();
+    $table->dateTime('scanned_at');
+    $table->timestamps();
+    $table->index('session_uuid');
+});
 
-            $table->string('uuid', 36)->unique();      // identificador del escaneo
-            $table->string('session_uuid', 36);        // referencia lógica a work_sessions.uuid
-
-            $table->string('project_code', 100)->nullable();
-            $table->string('area', 100)->nullable();
-            $table->text('description')->nullable();
-
-            $table->dateTime('scanned_at');
-
-            $table->timestamps();
-
-            $table->index('session_uuid');
-        });
     }
 
     public function down(): void

@@ -11,8 +11,10 @@ return new class extends Migration
         Schema::create('work_session_pauses', function (Blueprint $table) {
             $table->id();
 
-            $table->string('uuid', 36)->unique();      // identificador estable de la pausa
-            $table->string('session_uuid', 36);        // referencia lógica a work_sessions.uuid
+            $table->string('uuid', 36)->unique();      
+            
+            // ⬅️ Actualizado de 36 → 100
+            $table->string('session_uuid', 100);       
 
             $table->dateTime('start_at');
             $table->dateTime('end_at')->nullable();
