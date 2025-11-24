@@ -4,7 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\TechnicianProfileController;
 use App\Http\Controllers\Api\WorkSessionSyncController;
-use App\Http\Controllers\Api\DeviceController; // ⬅️ NUEVO: registro de dispositivos
+use App\Http\Controllers\Api\DeviceController; // ⬅️ registro de dispositivos
+use App\Http\Controllers\Api\WorkSessionLocationController; // ⬅️ NUEVO: ubicaciones de sesiones
 
 /*
 |--------------------------------------------------------------------------
@@ -37,7 +38,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Registro / actualización de dispositivo del usuario
     Route::post('/devices/register', [DeviceController::class, 'register']);
 
-    // Sincronización de sesiones de trabajo
+    // Sincronización de sesiones de trabajo (jornadas)
     Route::post('/work-sessions/sync', [WorkSessionSyncController::class, 'sync']);
     Route::get('/work-sessions', [WorkSessionSyncController::class, 'index']);
+
+    // ⬇️ NUEVO: sincronización de ubicaciones de las sesiones
+    Route::post(
+        '/work-session-locations/sync',
+        [WorkSessionLocationController::class, 'sync']
+    );
 });

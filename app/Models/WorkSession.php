@@ -26,8 +26,19 @@ class WorkSession extends Model
         'ended_at'   => 'datetime',
     ];
 
+    /**
+     * Relación: una jornada pertenece a un técnico
+     */
     public function tecnico()
     {
         return $this->belongsTo(Tecnico::class);
+    }
+
+    /**
+     * Relación: una jornada tiene muchos registros de ubicación
+     */
+    public function locations()
+    {
+        return $this->hasMany(WorkSessionLocation::class, 'work_session_id');
     }
 }
