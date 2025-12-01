@@ -9,10 +9,15 @@ use App\Http\Controllers\ChatreporteController;
 use App\Http\Controllers\RubroController;
 use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\UserController; 
+
+use App\Http\Controllers\ReporteHorasController;   // Vista 1
+use App\Http\Controllers\ReporteDiarioController;  // Vista 2
+use App\Http\Controllers\UbicacionController;      // Para guardar ubicaciones desde diario
+
 /*
-|--------------------------------------------------------------------------|
-| Rutas Públicas                                                          |
-|--------------------------------------------------------------------------|
+|--------------------------------------------------------------------------
+| Rutas Públicas
+|--------------------------------------------------------------------------
 */
 
 // Ruta raíz: muestra la vista de login
@@ -21,9 +26,9 @@ Route::get('/', function () {
 });
 
 /*
-|--------------------------------------------------------------------------|
-| Rutas protegidas por autenticación                                       |
-|--------------------------------------------------------------------------|
+|--------------------------------------------------------------------------
+| Rutas protegidas por autenticación
+|--------------------------------------------------------------------------
 */
 
 // CRUD para empleados, protegido por login
@@ -33,6 +38,21 @@ Route::resource('proyecto', ProyectoController::class)->middleware('auth');
 Route::resource('reporte', ReporteController::class)->middleware('auth');
 Route::resource('chatreporte', ChatreporteController::class)->middleware('auth');
 Route::resource('rubros', RubroController::class)->middleware('auth');  // <--- Agregado
+
+// Vista 1: reporte de horas por técnico
+Route::get('/reportes/horas', [ReporteHorasController::class, 'index'])
+    ->name('reportes.horas')
+    ->middleware('auth');
+
+// Vista 2: reporte diario con ubicaciones
+Route::get('/reportes/diario', [ReporteDiarioController::class, 'index'])
+    ->name('reportes.diario')
+    ->middleware('auth');
+
+// Guardar / crear ubicación desde la vista diario (modal)
+Route::post('/ubicaciones/storeFromDiario', [UbicacionController::class, 'storeFromDiario'])
+    ->name('ubicaciones.storeFromDiario')
+    ->middleware('auth');
 
 // Rutas para Facturas
 Route::get('/facturas/upload', [FacturaController::class, 'formUpload'])->name('facturas.upload.form');
@@ -66,9 +86,9 @@ Route::get('/admin/register', [UserController::class, 'create'])
    ->middleware('auth'); // Puedes cambiar esto a 'isAdmin' si tienes roles
 
 /*
-|--------------------------------------------------------------------------|
-| Autenticación                                                            |
-|--------------------------------------------------------------------------|
+|--------------------------------------------------------------------------
+| Autenticación
+|--------------------------------------------------------------------------
 */
 
 // Rutas de login/logout, sin permitir registro ni reset de contraseña

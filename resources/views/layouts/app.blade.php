@@ -52,6 +52,22 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url('/buscador') }}">Buscar productos</a>
                         </li>
+
+                        {{-- NUEVO: Menú de reportes --}}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="reportesDropdown" role="button"
+                               data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                Reporte horas tecnicos
+                            </a>
+                            <div class="dropdown-menu" aria-labelledby="reportesDropdown">
+                                <a class="dropdown-item" href="{{ route('reportes.horas') }}">
+                                    Reporte de horas
+                                </a>
+                                <a class="dropdown-item" href="{{ route('reportes.diario', ['fecha' => now()->toDateString()]) }}">
+                                    Reporte diario
+                                </a>
+                            </div>
+                        </li>
                     </ul>
 
                     <!-- Menú Derecho (Usuario) -->

@@ -26,8 +26,21 @@ class WorkSessionLocation extends Model
         'recorded_at' => 'datetime',
     ];
 
+    /**
+     * Relación con la sesión principal
+     * work_session_locations → work_sessions
+     */
     public function session()
     {
         return $this->belongsTo(WorkSession::class, 'work_session_id');
+    }
+
+    /**
+     * Relación con el técnico
+     * Esto permite acceder a $location->tecnico->nombres
+     */
+    public function tecnico()
+    {
+        return $this->belongsTo(Tecnico::class, 'tecnico_id');
     }
 }

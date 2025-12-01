@@ -3,18 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cliente extends Model
 {
-    // Define el nombre de la tabla si no sigue el nombre por defecto (plural y en minúsculas)
     protected $table = 'clientes';
 
-    // Define la clave primaria de la tabla si no es "id" o si tu clave primaria es diferente
-    protected $primaryKey = 'id_cliente'; 
+    // PK real de tu tabla
+    protected $primaryKey = 'id_cliente';
 
-    public $timestamps = true; // Cambia a false si no tienes created_at y updated_at
+    public $timestamps = true;
 
-    // Los campos que son asignables masivamente
     protected $fillable = [
         'empresa',
         'ruc',
@@ -24,10 +24,25 @@ class Cliente extends Model
         'web',
     ];
 
-    // Relación con los requerimientos (asumiendo que un cliente tiene muchos requerimientos)
-    public function requerimientos()
+    /**
+     * Relación: un cliente tiene muchos requerimientos
+     */
+    public function requerimientos(): HasMany
     {
         return $this->hasMany(Requerimientos::class, 'id_cliente', 'id_cliente');
     }
-}
 
+    /**
+     * Relación muchos-a-muchos: un cliente puede tener varias ubicaciones.
+     * Pivot: cliente_ubicacion
+     */
+    public function ubicaciones(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Ubicacion::class,      // modelo relacionado
+            'cliente_ubicacion',   // tabla pivote
+            'cliente_id',          // FK en pivote que apunta a clientes.id_cliente
+            'ubicacion_id'         // FK en pivote que apunta a ubicaciones.id
+        );
+    }
+}

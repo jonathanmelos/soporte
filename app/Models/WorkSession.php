@@ -4,10 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkSession extends Model
 {
     use HasFactory;
+
+    protected $table = 'work_sessions';
 
     protected $fillable = [
         'tecnico_id',
@@ -19,6 +23,8 @@ class WorkSession extends Model
         'end_lat',
         'end_lng',
         'device_session_uuid',
+        'uuid',
+        'device_uuid',
     ];
 
     protected $casts = [
@@ -27,17 +33,17 @@ class WorkSession extends Model
     ];
 
     /**
-     * Relación: una jornada pertenece a un técnico
+     * Relación: una jornada pertenece a un técnico.
      */
-    public function tecnico()
+    public function tecnico(): BelongsTo
     {
-        return $this->belongsTo(Tecnico::class);
+        return $this->belongsTo(Tecnico::class, 'tecnico_id');
     }
 
     /**
-     * Relación: una jornada tiene muchos registros de ubicación
+     * Relación: una jornada tiene muchos registros de ubicación.
      */
-    public function locations()
+    public function locations(): HasMany
     {
         return $this->hasMany(WorkSessionLocation::class, 'work_session_id');
     }
