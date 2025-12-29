@@ -44,61 +44,91 @@ class ReporteHorasController extends Controller
         $totalPrecio = 0.0;
 
         foreach ($sessions as $s) {
+            /** @var ?Carbon $start */
             $start = $s->started_at;
+            /** @var ?Carbon $end */
             $end   = $s->ended_at;
 
-            // Total de horas de la sesión
-            $horas = 0.0;
-            if (!is_null($s->duration_seconds)) {
-                $horas = round($s->duration_seconds / 3600, 2);
-                $totalHoras += $horas;
+            // Si no tenemos inicio no podemos calcular nada
+            if (!$start) {
+                continue;
             }
 
-            // Tipo de jornada según hora de inicio y día
-            $tipoJornada = $this->clasificarJornada($start);
-
-            // Obtenemos las tarifas del técnico (pueden venir null)
-            $tec          = $s->tecnico;
-            $tarifa1      = $tec?->tarifa_hora_1 ?? 0;
-            $tarifa2      = $tec?->tarifa_hora_2 ?? 0;
-            $tarifa3      = $tec?->tarifa_hora_3 ?? 0;
-
-            // Elegimos la tarifa según el tipo de jornada
-            switch ($tipoJornada) {
-                case 'normal':
-                    $precioUnitario = $tarifa1;
-                    break;
-                case 'adicional':
-                    $precioUnitario = $tarifa2;
-                    break;
-                case 'extra':
-                    $precioUnitario = $tarifa3;
-                    break;
-                default:
-                    $precioUnitario = 0;
-                    break;
+            // Si no hay ended_at pero sí duration_seconds, lo calculamos
+            if (!$end && !is_null($s->duration_seconds)) {
+                $end = $start->copy()->addSeconds($s->duration_seconds);
             }
 
-            // Precio total de la sesión
-            $precioTotal  = round($horas * $precioUnitario, 2);
-            $totalPrecio += $precioTotal;
+            // Si aún así no tenemos fin, saltamos la sesión
+            if (!$end) {
+                continue;
+            }
 
-            $rows[] = [
-                'fecha'           => $start ? $start->toDateString() : '',
-                'dia'             => $start
-                    ? ucfirst(Carbon::parse($start)->locale('es')->dayName)
-                    : '',
-                'tecnico'         => $this->nombreTecnico($s->tecnico),
-                'hora_entrada'    => $start ? $start->format('H:i') : '',
-                'hora_salida'     => $end ? $end->format('H:i') : '',
-                'horas'           => $horas,
-                'tipo_jornada'    => $tipoJornada,
+            // Si terminó antes de empezar, asumimos que cruza medianoche
+            if ($end->lt($start)) {
+                $end = $end->copy()->addDay();
+            }
 
-                // Nuevos campos para precios
-                'precio_unitario' => $precioUnitario,
-                'precio_total'    => $precioTotal,
-            ];
+            // Partimos la sesión en segmentos según tipo de jornada
+            $segments = $this->segmentarPorTipoJornada($start, $end);
+
+            $tec     = $s->tecnico;
+            $tarifa1 = $tec?->tarifa_hora_1 ?? 0; // normal
+            $tarifa2 = $tec?->tarifa_hora_2 ?? 0; // adicional
+            $tarifa3 = $tec?->tarifa_hora_3 ?? 0; // extra
+
+            foreach ($segments as $seg) {
+                /** @var Carbon $segStart */
+                $segStart = $seg['start'];
+                /** @var Carbon $segEnd */
+                $segEnd   = $seg['end'];
+                $tipo     = $seg['tipo_jornada'];
+
+                $seconds = $segStart->diffInSeconds($segEnd);
+                $horas   = round($seconds / 3600, 2);
+
+                if ($horas <= 0) {
+                    continue;
+                }
+
+                // Elegimos la tarifa según el tipo de jornada
+                switch ($tipo) {
+                    case 'normal':
+                        $precioUnitario = $tarifa1;
+                        break;
+                    case 'adicional':
+                        $precioUnitario = $tarifa2;
+                        break;
+                    case 'extra':
+                        $precioUnitario = $tarifa3;
+                        break;
+                    default:
+                        $precioUnitario = 0;
+                        break;
+                }
+
+                $precioTotal  = round($horas * $precioUnitario, 2);
+                $totalHoras  += $horas;
+                $totalPrecio += $precioTotal;
+
+                $rows[] = [
+                    'fecha'           => $segStart->toDateString(),
+                    'dia'             => ucfirst($segStart->locale('es')->dayName),
+                    'tecnico'         => $this->nombreTecnico($s->tecnico),
+                    'hora_entrada'    => $segStart->format('H:i'),
+                    'hora_salida'     => $segEnd->format('H:i'),
+                    'horas'           => $horas,
+                    'tipo_jornada'    => $tipo,
+                    'precio_unitario' => $precioUnitario,
+                    'precio_total'    => $precioTotal,
+                ];
+            }
         }
+
+        // Ordenamos por fecha y hora entrada por si acaso
+        usort($rows, function ($a, $b) {
+            return strcmp($a['fecha'] . ' ' . $a['hora_entrada'], $b['fecha'] . ' ' . $b['hora_entrada']);
+        });
 
         // Técnicos para el combo
         $tecnicos = Tecnico::orderBy('nombres')->get();
@@ -107,7 +137,6 @@ class ReporteHorasController extends Controller
             'rows'        => $rows,
             'totalHoras'  => $totalHoras,
             'totalPrecio' => $totalPrecio,
-            // estos nombres son los que usas en la vista
             'desde'       => $desde,
             'hasta'       => $hasta,
             'tecnicos'    => $tecnicos,
@@ -130,43 +159,83 @@ class ReporteHorasController extends Controller
     }
 
     /**
-     * Clasifica el tipo de jornada según la hora de inicio y el día:
+     * Parte una sesión en segmentos por tipo de jornada:
      *
      * - Lunes a viernes:
-     *   - 08:00–17:30  → normal
-     *   - >17:30–24:00 → adicional
-     *   - 00:00–08:00  → extra
+     *   - 00:00–06:00 → extra
+     *   - 06:00–08:00 → extra (franja intermedia, la contamos como extra)
+     *   - 08:00–17:00 → normal
+     *   - 17:00–24:00 → adicional
      *
-     * - Sábado y domingo → extra
+     * - Sábado y domingo: todo se considera extra.
+     *
+     * @return array cada item: ['start' => Carbon, 'end' => Carbon, 'tipo_jornada' => string]
      */
-    protected function clasificarJornada(?Carbon $inicio): string
+    protected function segmentarPorTipoJornada(Carbon $start, Carbon $end): array
     {
-        if (!$inicio) {
-            return '';
+        $segments = [];
+        $cursor   = $start->copy();
+
+        while ($cursor < $end) {
+            $dayStart = $cursor->copy()->startOfDay();
+            $dayEnd   = $cursor->copy()->endOfDay(); // 23:59:59
+
+            // Este trozo de sesión no pasa de este día
+            $limit = $end->copy()->min($dayEnd);
+
+            // Si es fin de semana, TODO el tramo es extra
+            if ($cursor->isWeekend()) {
+                $segments[] = [
+                    'start'        => $cursor->copy(),
+                    'end'          => $limit->copy(),
+                    'tipo_jornada' => 'extra',
+                ];
+                // avanzamos al siguiente segundo después del límite
+                $cursor = $limit->copy()->addSecond();
+                continue;
+            }
+
+            // Definimos las bandas horarias para ese día
+            $extraStart1   = $dayStart->copy()->setTime(0, 0);
+            $extraEnd1     = $dayStart->copy()->setTime(6, 0);  // 00:00–06:00 extra
+
+            $extraStart2   = $dayStart->copy()->setTime(6, 0);
+            $extraEnd2     = $dayStart->copy()->setTime(8, 0);  // 06:00–08:00 extra (decisión conservadora)
+
+            $normalStart   = $dayStart->copy()->setTime(8, 0);  // 08:00
+            $normalEnd     = $dayStart->copy()->setTime(17, 0); // 17:00
+
+            $adicionalStart= $dayStart->copy()->setTime(17, 0); // ~17:01 en la práctica
+            $adicionalEnd  = $dayEnd->copy();                   // hasta 23:59:59
+
+            $bands = [
+                ['start' => $extraStart1,    'end' => $extraEnd1,     'tipo' => 'extra'],
+                ['start' => $extraStart2,    'end' => $extraEnd2,     'tipo' => 'extra'],
+                ['start' => $normalStart,    'end' => $normalEnd,     'tipo' => 'normal'],
+                ['start' => $adicionalStart, 'end' => $adicionalEnd,  'tipo' => 'adicional'],
+            ];
+
+            foreach ($bands as $band) {
+                $bandStart = $band['start'];
+                $bandEnd   = $band['end'];
+
+                // Recortamos la banda al tramo [cursor, limit]
+                $segStart = $cursor->copy()->max($bandStart);
+                $segEnd   = $limit->copy()->min($bandEnd);
+
+                if ($segStart < $segEnd) {
+                    $segments[] = [
+                        'start'        => $segStart->copy(),
+                        'end'          => $segEnd->copy(),
+                        'tipo_jornada' => $band['tipo'],
+                    ];
+                }
+            }
+
+            // Pasamos al siguiente día / tramo
+            $cursor = $limit->copy()->addSecond();
         }
 
-        // Fines de semana siempre "extra"
-        if ($inicio->isWeekend()) {
-            return 'extra';
-        }
-
-        // Minutos desde medianoche
-        $minutos = $inicio->hour * 60 + $inicio->minute;
-
-        $ochoAM         = 8 * 60;           // 08:00
-        $cinco30PM      = 17 * 60 + 30;     // 17:30
-        $casiMedianoche = 24 * 60 - 1;      // 23:59
-
-        if ($minutos >= $ochoAM && $minutos <= $cinco30PM) {
-            return 'normal';
-        }
-
-        // Adicionales después de 17:30 hasta la medianoche
-        if ($minutos > $cinco30PM && $minutos <= $casiMedianoche) {
-            return 'adicional';
-        }
-
-        // Todo lo que quede (00:00–07:59) lo consideramos extra
-        return 'extra';
+        return $segments;
     }
 }

@@ -68,6 +68,11 @@
                                 </a>
                             </div>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url('/admin/otp-notifications') }}">
+                                Panel OTP
+                            </a>
+                        </li>
                     </ul>
 
                     <!-- Menú Derecho (Usuario) -->

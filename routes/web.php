@@ -8,11 +8,13 @@ use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\ChatreporteController;
 use App\Http\Controllers\RubroController;
 use App\Http\Controllers\FacturaController;
-use App\Http\Controllers\UserController; 
+use App\Http\Controllers\UserController;
 
 use App\Http\Controllers\ReporteHorasController;   // Vista 1
 use App\Http\Controllers\ReporteDiarioController;  // Vista 2
 use App\Http\Controllers\UbicacionController;      // Para guardar ubicaciones desde diario
+
+use App\Http\Controllers\Admin\OtpNotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -96,3 +98,17 @@ Auth::routes([
     'register' => true,
     'reset' => false,
 ]);
+
+/*
+|--------------------------------------------------------------------------
+| Admin - Panel OTP Notifications
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/otp-notifications', [OtpNotificationController::class, 'index'])->name('admin.otp.index');
+    Route::post('/otp-notifications/{notification}/mark-shared', [OtpNotificationController::class, 'markAsShared'])->name('admin.otp.markShared');
+    Route::get('/otp-notifications/{notification}/send-whatsapp', [OtpNotificationController::class, 'sendWhatsApp'])->name('admin.otp.sendWhatsApp');
+    Route::get('/otp-notifications/pending-count', [OtpNotificationController::class, 'pendingCount'])->name('admin.otp.pendingCount');
+    Route::get('/otp-notifications/latest', [OtpNotificationController::class, 'latest'])->name('admin.otp.latest');
+});

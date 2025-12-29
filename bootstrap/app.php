@@ -12,9 +12,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Aquí puedes registrar middleware globales si los necesitas
+        // Alias de middleware (equivalente a Kernel.php en Laravel <10)
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Aquí puedes personalizar el manejo de excepciones
+        // Manejo de excepciones personalizado si se requiere
     })
     ->create();
